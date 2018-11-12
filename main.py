@@ -8,26 +8,43 @@ import tools.linear_regression as lr
 import tools.lstm_network as lstm
 import tools.constants as constants
 import tools.plotting as plotting
+import seaborn as sns
 
 from sklearn.metrics import mean_squared_error, r2_score
 from cognite.config import configure_session
 from cognite.v05.timeseries import get_datapoints_frame
+from statsmodels.tsa.stattools import adfuller
+from pandas.plotting import scatter_matrix
 
 configure_session(os.environ.get('PUBLIC_DATA_KEY'), 'publicdata')
 
 
-input_tags = {'VAL_23-FT-92512:X.Value':'Gas inflow from separators',
-              'VAL_23-PT-92532:X.Value' : 'Compressor suction pressure',
-              'VAL_23-TT-92533:X.Value' : 'Compressor suction temperature'}
+input_tags = {'VAL_23-FT-92512:X.Value|average': 'Gas inflow from separators',
+              'VAL_23-PT-92532:X.Value|average' : 'Suction pressure',
+              'VAL_23-TT-92533:X.Value|average' : 'Suction temperature'}
 
-output_tags = {'VAL_23-FT-92537-01:X.Value' : 'Compressor discharge mass flow',
-               'VAL_23-FT-92537-04:X.Value' : 'Compressor discharge volume flow',
-               'VAL_23-PT-92539:X.Value' : 'Compressor discharge pressure',
-               'VAL_23-TT-92539:X.Value' : 'Compressor discharge temperature'}
+output_tags = {'VAL_23-FT-92537-01:X.Value|average' : 'Discharge mass flow',
+               'VAL_23-FT-92537-04:X.Value|average' : 'Discharge volume flow',
+               'VAL_23-PT-92539:X.Value|average' : 'Discharge pressure',
+               'VAL_23-TT-92539:X.Value|average' : 'Discharge temperature'}
 
-control_tags = {'VAL_23_ZT_92543:Z.X.Value' : 'Anti-surge valve position',
-                'VAL_23_ZT_92538:Z.X.Value' : 'Suction throttle valve position',
-                'VAL_23-KA-9101_ASP:VALUE' : 'Compressor shaft power'}
+control_tags = {'VAL_23_ZT_92543:Z.X.Value|average' : 'Anti-surge valve position',
+                'VAL_23_ZT_92538:Z.X.Value|average' : 'Suction throttle valve position',
+                'VAL_23-KA-9101_ASP:VALUE|average' : 'Shaft power'}
+
+
+input_tags = {'VAL_23-FT-92512:X.Value|average': 'Inflow',
+              'VAL_23-PT-92532:X.Value|average' : 'In. press.',
+              'VAL_23-TT-92533:X.Value|average' : 'In. temp.'}
+
+output_tags = {'VAL_23-FT-92537-01:X.Value|average' : 'Out. m. flow',
+               'VAL_23-FT-92537-04:X.Value|average' : 'Out. v. flow',
+               'VAL_23-PT-92539:X.Value|average' : 'Out. press.',
+               'VAL_23-TT-92539:X.Value|average' : 'Out. temp.'}
+
+control_tags = {'VAL_23_ZT_92543:Z.X.Value|average' : 'Anti-surge',
+                'VAL_23_ZT_92538:Z.X.Value|average' : 'In. throttle',
+                'VAL_23-KA-9101_ASP:VALUE|average' : 'Power'}
 
 
 def run_linear_regression(data, test_size, dates):
@@ -76,46 +93,49 @@ def run_linear_regression(data, test_size, dates):
     plotting.plt_act_pred(lr_act_press.to_frame(), pd.DataFrame({'Predicted': lr_pred_press}), dates ,'Pressure')
 
 
-def plot_input_control(data):
-    fig1, axs1 = plt.subplots(3, 1, figsize=(10, 10))
-    fig1.subplots_adjust(hspace=0.3)
-    fig2, axs2 = plt.subplots(3, 1, figsize=(10, 10))
-    fig2.legend().set_visible(False)
-    fig2.subplots_adjust(hspace=0.3)
 
-    axs1[0].plot(data[constants.COMPRESSOR_SUCTION_TEMPERATURE + '|average'], label='_nolegend_')
-    axs1[0].set_title('Input temperature degC')
+def test_stationarity(timeseries, title):
+    # Determing rolling statistics
+    rolmean = timeseries.rolling(30).mean()
+    rolstd = timeseries.rolling(30).std()
 
-    axs1[1].plot(data[constants.COMPRESSOR_SUCTION_PRESSURE + '|average'], label='_nolegend_')
-    axs1[1].set_title('Input pressure barg')
+    # Plot rolling statistics:
+    orig = plt.plot(timeseries, label='Values')
+    mean = plt.plot(rolmean, color='red', label='Rolling Mean')
+    std = plt.plot(rolstd, color='black', label='Rolling Std')
+    plt.legend(loc='best')
+    plt.title(title)
+    plt.show(block=False)
 
-    axs1[2].plot(data[constants.COMPRESSOR_GAS_INFLOW + '|average'], label='_nolegend_')
-    axs1[2].set_title('Gas inflow')
+    # Perform Dickey-Fuller test:
+    print('Results of Dickey-Fuller Test:')
+    dftest = adfuller(timeseries, autolag='AIC')
+    dfoutput = pd.Series(dftest[0:4], index=['Test Statistic', 'p-value', '#Lags Used', 'Number of Observations Used'])
+    for key, value in dftest[4].items():
+        dfoutput['Critical Value (%s)' % key] = value
+    print(dfoutput)
 
-    axs2[0].plot(data[constants.ANTI_SURGE_VALVE_POSITION + '|average'].interpolate(), label='_nolegend_')
-    axs2[0].set_title('Anti-surge valve position %')
 
-    axs2[1].plot(data[constants.SUCTION_THROTTLE_VALVE_POSITION + '|average'].interpolate(), label='_nolegend_')
-    axs2[1].set_title('Suction throttle valve position %')
-
-    axs2[2].plot(data[constants.COMPRESSOR_SHAFT_POWER + '|average'].interpolate(), label='_nolegend_')
-    axs2[2].set_title('Shaft power kW')
 
 def main():
-    start = datetime.datetime(2013,9,1)
-    end = datetime.datetime(2018,9,7)
-    granularity = '1h'
+    start = datetime.datetime(2018,1,2)
+    # start = datetime.datetime(2017,11,1)
+    end = datetime.datetime(2018,1,3)
+    # end = datetime.datetime(2018,11,1)
+    granularity = '1s'
     aggregates = [
         'avg',
-        'min',
-        'max'
+        # 'min',
+        # 'max'
     ]
     tags = [
         constants.COMPRESSOR_SUCTION_PRESSURE,
         constants.COMPRESSOR_SUCTION_TEMPERATURE,
-        constants.COMPRESSOR_DISCHARGE_TEMPERATURE,
         constants.COMPRESSOR_GAS_INFLOW,
+        constants.COMPRESSOR_DISCHARGE_TEMPERATURE,
         constants.COMPRESSOR_DISCHARGE_PRESSURE,
+        constants.COMPRESSOR_DISCHARGE_MASS_FLOW,
+        constants.COMPRESSOR_DISCHARGE_VOLUME_FLOW,
         constants.ANTI_SURGE_VALVE_POSITION,
         constants.SUCTION_THROTTLE_VALVE_POSITION,
         constants.COMPRESSOR_SHAFT_POWER,
@@ -123,12 +143,21 @@ def main():
     test_size = 30
     data  = get_datapoints_frame(time_series=tags, start=start, end=end, granularity=granularity, aggregates=aggregates)
     data.set_index(pd.to_datetime(data['timestamp'], unit='ms'), inplace=True)
-
-
-    plot_input_control(data)
-
-
     dates = pd.to_datetime(data['timestamp'][-test_size:])
+    data = data.drop(data.columns[0], axis=1)
+    data = data.rename(index=str, columns=control_tags)
+    data = data.rename(index=str, columns=input_tags)
+    data = data.rename(index=str, columns=output_tags)
+
+
+    scatter_matrix(data)
+
+
+    # plotting.plot_input_control(data)
+    # plotting.plot_output(data)
+    # test_stationarity(data[constants.COMPRESSOR_DISCHARGE_VOLUME_FLOW + '|average'].interpolate(), 'Output Volume Flow')
+
+
 
     # run_linear_regression(data, test_size, dates)
 
