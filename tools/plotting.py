@@ -18,13 +18,13 @@ def plot_input_control(data):
     fig2.legend().set_visible(False)
     fig2.subplots_adjust(hspace=0.3)
 
-    axs1[0].plot(data[constants.COMPRESSOR_SUCTION_TEMPERATURE + '|average'], label='_nolegend_')
+    axs1[0].plot(data[constants.COMPRESSOR_SUCTION_TEMPERATURE + '|average'].interpolate(), label='_nolegend_')
     axs1[0].set_title('Suction temperature')
 
-    axs1[1].plot(data[constants.COMPRESSOR_SUCTION_PRESSURE + '|average'], label='_nolegend_')
+    axs1[1].plot(data[constants.COMPRESSOR_SUCTION_PRESSURE + '|average'].interpolate(), label='_nolegend_')
     axs1[1].set_title('Suction pressure')
 
-    axs1[2].plot(data[constants.COMPRESSOR_GAS_INFLOW + '|average'], label='_nolegend_')
+    axs1[2].plot(data[constants.COMPRESSOR_GAS_INFLOW + '|average'].interpolate(), label='_nolegend_')
     axs1[2].set_title('Gas inflow from separators')
 
     axs2[0].plot(data[constants.ANTI_SURGE_VALVE_POSITION + '|average'].interpolate(), label='_nolegend_')

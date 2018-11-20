@@ -49,11 +49,13 @@ control_tags = {'VAL_23_ZT_92543:Z.X.Value|average' : 'Anti-surge valve position
 #                 'VAL_23_ZT_92538:Z.X.Value|average' : 'In. throttle',
 #                 'VAL_23-KA-9101_ASP:VALUE|average' : 'Power'}
 
-def preprocess_data(X, y, X_test, y_test):
+def preprocess_data(X, y, X_test, y_test, X_val, y_val):
     X = X.interpolate()
     y = y.interpolate()
     X_test = X_test.interpolate()
     y_test = y_test.interpolate()
+    X_val = X_val.interpolate()
+    y_val = y_val.interpolate()
 
     print('Remaining NaN count')
     print(X.isna().sum())
@@ -63,14 +65,17 @@ def preprocess_data(X, y, X_test, y_test):
 
     min_max_scaler.partial_fit(X)
     min_max_scaler.partial_fit(X_test)
+    min_max_scaler.partial_fit(X_val)
 
     X_scaled = min_max_scaler.transform(X)
+    X_val_scaled = min_max_scaler.transform(X_val)
 
     remaining_nan = max(X.isna().sum().max(), y.isna().sum())
     remaining_nan_test = max(X_test.isna().sum().max(), y_test.isna().sum())
+    remaining_nan_val = max(X_val.isna().sum().max(), y_val.isna().sum())
 
     return X_scaled[remaining_nan:], y[remaining_nan:], X_test[remaining_nan_test:], y_test[remaining_nan_test:], \
-           remaining_nan, remaining_nan_test, min_max_scaler
+           X_val_scaled[remaining_nan_val:], y_val[remaining_nan_val:], remaining_nan, remaining_nan_test, min_max_scaler
 
 
 def add_lagged_var(X, y, y_value, num_lag, dates):
@@ -127,7 +132,8 @@ def main():
 
     #Data samples
     start = datetime.datetime(2018,1,1, hour=23, minute=59, second=23)
-    end = datetime.datetime(2018,1,3, second=0)
+    # end = datetime.datetime(2018,1,3, second=0)
+    end = datetime.datetime(2018,1,2, hour=12)
 
     granularity = '1s'
     aggregates = [
@@ -161,7 +167,7 @@ def main():
     #Test data
     start_minute = 59
     extra_seconds = (60 - start_minute)*60
-    start = datetime.datetime(2018,10, 2, hour=23, minute=start_minute, second=1)
+    start = datetime.datetime(2018,10, 2, hour=22, minute=start_minute, second=1)
     end = datetime.datetime(2018, 10, 3, hour=1, second=1)
     # end = datetime.datetime(2018, 10, 4, second=1)
     data_test = get_datapoints_frame(time_series=tags, start=start, end=end, granularity=granularity, aggregates=aggregates)
@@ -172,8 +178,21 @@ def main():
     data_test = data_test.rename(index=str, columns=control_tags)
     data_test = data_test.rename(index=str, columns=input_tags)
     data_test = data_test.rename(index=str, columns=output_tags)
-
     # scatter_matrix(data)
+
+    #Val data
+    start = datetime.datetime(2018, 5, 11,)
+    end = datetime.datetime(2018, 5, 11, hour=1,)
+    # end = datetime.datetime(2018, 10, 4, second=1)
+    data_val = get_datapoints_frame(time_series=tags, start=start, end=end, granularity=granularity,
+                                     aggregates=aggregates)
+    data_val.set_index(pd.to_datetime(data_val['timestamp'], unit='ms'), inplace=True)
+    dates_val = pd.to_datetime(data_val['timestamp'], unit='ms')
+    # plotting.plot_input_control(data_val)
+    data_val = data_val.drop(data_val.columns[0], axis=1)
+    data_val = data_val.rename(index=str, columns=control_tags)
+    data_val = data_val.rename(index=str, columns=input_tags)
+    data_val = data_val.rename(index=str, columns=output_tags)
 
     # col = 'Discharge volume flow'
     # plot_acf(data[col].interpolate(),lags=60, title=col+' ACF')
@@ -190,21 +209,25 @@ def main():
         'Shaft power'
     ]
 
-    y_value = 'Discharge temperature'
+    y_value = 'Discharge mass flow'
 
     X = data[x_values]
     y = data[y_value]
     X_test = data_test[x_values]
     y_test = data_test[y_value]
+    X_val = data_val[x_values]
+    y_val = data_val[y_value]
 
     lag = 0
     X, y = add_lagged_var(X, y, y_value, lag, dates)
     dates = dates[lag:]
     X_test, y_test = add_lagged_var(X_test, y_test, y_value, lag, dates_test)
     dates_test = dates_test[lag:]
+    X_val, y_val = add_lagged_var(X_val, y_val, y_value, lag, dates_val)
+    dates_val = dates_val[lag:]
 
 
-    X, y, X_test, y_test, remaining_nan, remaining_nan_test, scaler = preprocess_data(X, y, X_test, y_test)
+    X, y, X_test, y_test, X_val, y_val, remaining_nan, remaining_nan_test, scaler = preprocess_data(X, y, X_test, y_test, X_val, y_val)
     dates = dates[remaining_nan:]
     dates_test = dates_test[extra_seconds:]
 
@@ -212,9 +235,10 @@ def main():
     X_test = X_test.iloc[extra_seconds-remaining_nan_test:]
     y_test = y_test.iloc[extra_seconds-remaining_nan_test:]
 
-    lr.run_linear_regression(X, y, X_test, y_test, dates, dates_test,x_values, y_value, lag, scaler, one_step=False)
+    # lr.run_linear_regression(X, y, X_test, y_test, dates, dates_test,x_values, y_value, lag, scaler, one_step=True)
 
-
+    old_model = None
+    lstm.run_lstm(X, y, X_test, y_test, X_val, y_val, dates_test, x_values, y_value, scaler, old_model, save=True)
 
     # lstm_act_temp, lstm_pred_temp = lstm.predict(data[
     #                                                  [
