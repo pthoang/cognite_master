@@ -131,9 +131,9 @@ def main():
     # granularity = '24h'
 
     #Data samples
-    start = datetime.datetime(2018,1,1, hour=23, minute=59, second=23)
-    # end = datetime.datetime(2018,1,3, second=0)
-    end = datetime.datetime(2018,1,2, hour=12)
+    start = datetime.datetime(2018,1,5, hour=23, minute=59, second=23)
+    end = datetime.datetime(2018,1,7, second=0)
+    # end = datetime.datetime(2018,1,2, hour=12)
 
     granularity = '1s'
     aggregates = [
@@ -168,8 +168,10 @@ def main():
     start_minute = 59
     extra_seconds = (60 - start_minute)*60
     start = datetime.datetime(2018,10, 2, hour=22, minute=start_minute, second=1)
-    end = datetime.datetime(2018, 10, 3, hour=1, second=1)
-    # end = datetime.datetime(2018, 10, 4, second=1)
+    #Adding one hour for LSTM
+    # start = datetime.datetime(2018,10, 2, hour=23, minute=start_minute, second=1)
+    # end = datetime.datetime(2018, 10, 3, hour=1, second=1)
+    end = datetime.datetime(2018, 10, 4, second=1)
     data_test = get_datapoints_frame(time_series=tags, start=start, end=end, granularity=granularity, aggregates=aggregates)
     data_test.set_index(pd.to_datetime(data_test['timestamp'], unit='ms'), inplace=True)
     dates_test = pd.to_datetime(data_test['timestamp'], unit='ms')
@@ -209,7 +211,7 @@ def main():
         'Shaft power'
     ]
 
-    y_value = 'Discharge mass flow'
+    y_value = 'Discharge temperature'
 
     X = data[x_values]
     y = data[y_value]
@@ -231,14 +233,22 @@ def main():
     dates = dates[remaining_nan:]
     dates_test = dates_test[extra_seconds:]
 
-
     X_test = X_test.iloc[extra_seconds-remaining_nan_test:]
     y_test = y_test.iloc[extra_seconds-remaining_nan_test:]
 
-    # lr.run_linear_regression(X, y, X_test, y_test, dates, dates_test,x_values, y_value, lag, scaler, one_step=True)
+    # 1 hour test data
+    # hour = 3600*2
+    # X_test = X_test[:hour]
+    # y_test = y_test[:hour]
+    # dates_test = dates_test[:hour]
 
+
+    lr.run_linear_regression(X, y, X_test, y_test, dates, dates_test,x_values, y_value, lag, scaler, one_step=True)
+
+    loss = 'mse'
+    # old_model = 'models/' + '_'.join(y_value.split(' ')) + '_' + loss +  '.h5'
     old_model = None
-    lstm.run_lstm(X, y, X_test, y_test, X_val, y_val, dates_test, x_values, y_value, scaler, old_model, save=True)
+    # lstm.run_lstm(X, y, X_test, y_test, X_val, y_val, dates_test, x_values, y_value, scaler, old_model, save=True, loss=loss)
 
     # lstm_act_temp, lstm_pred_temp = lstm.predict(data[
     #                                                  [
