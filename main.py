@@ -6,6 +6,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 import tools.linear_regression as lr
 import tools.lstm_network as lstm
+import tools.knn as knn
 import tools.constants as constants
 import tools.plotting as plotting
 import seaborn as sns
@@ -167,9 +168,9 @@ def main():
     #Test data
     start_minute = 59
     extra_seconds = (60 - start_minute)*60
-    start = datetime.datetime(2018,10, 2, hour=22, minute=start_minute, second=1)
     #Adding one hour for LSTM
-    # start = datetime.datetime(2018,10, 2, hour=23, minute=start_minute, second=1)
+    # start = datetime.datetime(2018,10, 2, hour=22, minute=start_minute, second=1)
+    start = datetime.datetime(2018,10, 2, hour=23, minute=start_minute, second=1)
     # end = datetime.datetime(2018, 10, 3, hour=1, second=1)
     end = datetime.datetime(2018, 10, 4, second=1)
     data_test = get_datapoints_frame(time_series=tags, start=start, end=end, granularity=granularity, aggregates=aggregates)
@@ -184,7 +185,7 @@ def main():
 
     #Val data
     start = datetime.datetime(2018, 5, 11,)
-    end = datetime.datetime(2018, 5, 11, hour=1,)
+    end = datetime.datetime(2018, 5, 11, hour=2,)
     # end = datetime.datetime(2018, 10, 4, second=1)
     data_val = get_datapoints_frame(time_series=tags, start=start, end=end, granularity=granularity,
                                      aggregates=aggregates)
@@ -211,7 +212,7 @@ def main():
         'Shaft power'
     ]
 
-    y_value = 'Discharge temperature'
+    y_value = 'Discharge pressure'
 
     X = data[x_values]
     y = data[y_value]
@@ -237,18 +238,20 @@ def main():
     y_test = y_test.iloc[extra_seconds-remaining_nan_test:]
 
     # 1 hour test data
-    # hour = 3600*2
+    # hour = 3600
     # X_test = X_test[:hour]
     # y_test = y_test[:hour]
     # dates_test = dates_test[:hour]
 
 
-    lr.run_linear_regression(X, y, X_test, y_test, dates, dates_test,x_values, y_value, lag, scaler, one_step=True)
+    # lr.run_linear_regression(X, y, X_test, y_test, dates, dates_test,x_values, y_value, lag, scaler, actual=False)
+    knn.run_knn(X, y, X_test, y_test, X_val, y_val, dates_test, x_values, y_value, lag, scaler, actual=True)
 
     loss = 'mse'
     # old_model = 'models/' + '_'.join(y_value.split(' ')) + '_' + loss +  '.h5'
     old_model = None
     # lstm.run_lstm(X, y, X_test, y_test, X_val, y_val, dates_test, x_values, y_value, scaler, old_model, save=True, loss=loss)
+
 
     # lstm_act_temp, lstm_pred_temp = lstm.predict(data[
     #                                                  [

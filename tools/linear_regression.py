@@ -28,24 +28,24 @@ def predict(X, Y, test_size):
     return Y_test, Y_pred
 
 
-def run_linear_regression(X, y, X_test, y_test, dates, dates_test, x_values, y_value, lag, scaler, one_step):
+def run_linear_regression(X, y, X_test, y_test, dates, dates_test, x_values, y_value, lag, scaler, actual):
 
 
     model = linear_model.LinearRegression()
 
-    hour = 3600
-    X = np.append(X, scaler.transform(X_test[:hour]), axis=0)
-    y = y.append(y_test[:hour])
-
-    X_test = X_test[hour:]
-    y_test = y_test[hour:]
-    dates_test = dates_test[hour:]
+    # hour = 3600
+    # X = np.append(X, scaler.transform(X_test[:hour]), axis=0)
+    # y = y.append(y_test[:hour])
+    #
+    # X_test = X_test[hour:]
+    # y_test = y_test[hour:]
+    # dates_test = dates_test[hour:]
 
     model.fit(X, y)
 
     y_pred = []
 
-    if one_step:
+    if actual:
         y_pred = model.predict(scaler.transform(X_test))
     else:
         if lag > 0:
