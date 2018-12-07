@@ -47,10 +47,10 @@ def run_knn(X, y, X_test, y_test, X_val, y_val, dates_test, x_values, y_value, l
     # y_test = y_test[hour:]
     # dates_test = dates_test[hour:]
 
-    test_for_k(X, y, X_val, y_val, y_value, True)
-    return
+    # test_for_k(X, y, X_val, y_val, y_value, True)
+    # return
 
-    model = neighbors.KNeighborsRegressor(n_neighbors=500, weights='uniform')
+    model = neighbors.KNeighborsRegressor(n_neighbors=100, weights='uniform')
 
     model.fit(X, y)
 
